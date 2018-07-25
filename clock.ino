@@ -189,8 +189,6 @@ static void displayClock(time_t t)
         }
         lix.write_crossfade(time, fade_time, roll_digits);
     }
-    else
-        yield();
 }
 
 static void checkWifi()
@@ -381,14 +379,4 @@ void sendNTPpacket(IPAddress& address)
     udp.beginPacket(address, 123); //NTP requests are to port 123
     udp.write(packetBuffer, NTP_PACKET_SIZE);
     udp.endPacket();
-}
-
-void setButtonColor(int red, int green, int blue)
-{
-    red = 255 - red;
-    green = 255 - green;
-    blue = 255 - blue;
-    analogWrite(RED_PIN, red);
-    analogWrite(GREEN_PIN, green);
-    analogWrite(BLUE_PIN, blue);  
 }
