@@ -141,28 +141,31 @@ static void checkDayNight(time_t t)
 static void displayDate(time_t t)
 {
     time_t local = UK.toLocal(lastDisplay);
-    if (DATE_VIEW && !dateMode && ((t - lastDate) >= DATE_VIEW*SECS_PER_MIN)
+    if (DATE_VIEW && !dateMode && minute(local) && (minute(local) % DATE_VIEW == 0)
         && (second(local) >= 10) && (second(local) <= 15))
     {
-        lix.roll_out(100, 0);
+        lix.roll_out(150, 0);
         lix.nixie_mode(false);
         lix.color(CRGB(200,0,200));
+        delay(200);
         // Allow for any padding needed.
         uint32_t date = 1000000;
-        date += day(t)*10000;
-        date += month(t)*100;
-        date += year(t) % 100;
+        date += day(local)*10000;
+        date += month(local)*100;
+        date += year(local) % 100;
         // Write to the display.
         //lix.roll_in(sum, 100);
-        lix.waterfall(date, 400, 2500, 0);
+        lix.waterfall(date, 400, 2000, 0);
         dateMode = true;
         lastDate = t;
     }
     else if (dateMode && ((t - lastDate) >= DATE_DURATION))
     {
-        lix.roll_out(100, 1);
+        lix.roll_out(150, 1);
         lix.nixie_mode(true, true);
+        delay(200);
         dateMode = false;
+        lastDisplay = t;
     }
 }
 
@@ -239,6 +242,7 @@ static void connectToWifi(void)
     Serial.println(ssid);
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
+    WiFi.hostname("GTClock");
     WiFi.begin(ssid, pass);
 
     while (WiFi.status() != WL_CONNECTED)
