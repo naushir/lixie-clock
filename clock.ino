@@ -45,7 +45,7 @@ static time_t lastStatus = 0;
 
 // Maximum allowable minutes without syncing in secs.
 static const time_t maxSyncTimeout = 360*SECS_PER_MIN;
-// Hour/minuite to switch night mode on (24hr, must be greather than 12)
+// Hour/minute to switch night mode on (24hr, must be greather than 12)
 #define NIGHT_HOUR      23
 #define NIGHT_MIN       00
 // Hour/minuite to switch day mode on (must be less than 12)
@@ -54,9 +54,11 @@ static const time_t maxSyncTimeout = 360*SECS_PER_MIN;
 // Freqency of date view (min)
 #define DATE_VIEW        4
 // Duration of date view (secs)
-#define DATE_DURATION   15
+#define DATE_DURATION   12
 // Period to write out the clock status (secs).
 #define STATUS_TIME     30
+// Sync time (mins)
+#define SYNC_TIME       15
 
 static bool outOfSync = false;
 static bool nightMode = false;
@@ -77,15 +79,11 @@ void setup()
     connectToWifi();
     setupOTA();
 
-    // Get initial time, and setup sync updates.
-    // Start with a refresh period of 1s until we succeed.
-    setSyncInterval(1);
-    setSyncProvider(getNtpTime);
-    while (timeStatus() != timeSet)
+    // Get initial time.  Cannot continue without this.
+    while (!setNtpTime())
         yield();
 
-    // Resync period is now longer.
-    setSyncInterval(27*SECS_PER_MIN);
+    // Initial times.
     uptime = lastDate = now();
 }
 
@@ -104,6 +102,18 @@ void loop()
 
 static void checkTimeSync(time_t t)
 {
+    time_t local = UK.toLocal(t);
+    // Make sure we are:
+    // - not in date mode.
+    // - not at minute 0.
+    // - between 10-15 secs.
+    // - have not synced in the last minute.
+    if (!dateMode && minute(local) && (minute(local) % SYNC_TIME == 0)
+        && (second(local) >= 10) && (second(local) <= 15) && (t - lastSync) > 60)
+    {
+        setNtpTime();
+    }
+
     if (!outOfSync && ((t - lastSync) >= maxSyncTimeout))
     {
         lix.nixie_mode(false, false);
@@ -147,7 +157,7 @@ static void displayDate(time_t t)
         lix.roll_out(150, 0);
         lix.nixie_mode(false);
         lix.color(CRGB(200,0,200));
-        delay(200);
+        delay(400);
         // Allow for any padding needed.
         uint32_t date = 1000000;
         date += day(local)*10000;
@@ -163,8 +173,9 @@ static void displayDate(time_t t)
     {
         lix.roll_out(150, 1);
         lix.nixie_mode(true, true);
-        delay(200);
+        delay(400);
         dateMode = false;
+        // Sync to the next clock display.
         lastDisplay = t;
     }
 }
@@ -303,7 +314,7 @@ static void rainbow(void)
     lix.nixie_mode(true, true);
 }
 
-time_t getNtpTime(void)
+bool setNtpTime(void)
 {
     Serial.print("Getting NTP time.");
     //get a random server from the pool
@@ -349,14 +360,15 @@ time_t getNtpTime(void)
         epoch += (millis() - t + 500)/1000;
         // print Unix time:
         Serial.println(epoch);
+        setTime(epoch);
         // Record last sync time.
         lastSync = epoch;
-        return epoch;
+        return true;
     }
     else
     {
         Serial.println("NTP packet wait timeout.");
-        return 0;
+        return false;
     }
 }
 
