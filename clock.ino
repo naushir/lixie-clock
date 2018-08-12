@@ -95,9 +95,9 @@ void loop()
     displayClock(t);
     displayDate(t);
     writeStatus(t);
-    checkTimeSync(t);
     checkDayNight(t);
     checkWifi();
+    checkTimeSync(t);
 }
 
 static void checkTimeSync(time_t t)
@@ -109,9 +109,11 @@ static void checkTimeSync(time_t t)
     // - between 10-15 secs.
     // - have not synced in the last minute.
     if (!dateMode && minute(local) && (minute(local) % SYNC_TIME == 0)
-        && (second(local) >= 10) && (second(local) <= 15) && (t - lastSync) > 60)
+        && (second(local) >= 10) && (second(local) <= 15) && (t - lastSync > 60))
     {
         setNtpTime();
+        // Resync the time sample. Else, t could be < lastSync.
+        t = now();
     }
 
     if (!outOfSync && ((t - lastSync) >= maxSyncTimeout))
