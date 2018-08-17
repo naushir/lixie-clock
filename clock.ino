@@ -58,7 +58,7 @@ static const time_t maxSyncTimeout = 360*SECS_PER_MIN;
 // Period to write out the clock status (secs).
 #define STATUS_TIME     30
 // Sync time (mins)
-#define SYNC_TIME       15
+#define SYNC_TIME       20
 
 static bool outOfSync = false;
 static bool nightMode = false;
@@ -74,6 +74,7 @@ void setup()
     // 5V/3A allowed.
     lix.max_power(5, 3000);
     lix.nixie_mode(true, true);
+    lix.brightness(255);
 
     loadCredentials();
     connectToWifi();
@@ -133,18 +134,40 @@ static void checkTimeSync(time_t t)
 
 static void checkDayNight(time_t t)
 {
+    static const int steps = 14;
+    static const int br_night = 64;
+    static const int br_day = 255;
+
     time_t local = UK.toLocal(t);
     if (!nightMode && (hour(local) >= NIGHT_HOUR && minute(local) >= NIGHT_MIN) 
         && hour(local) >= 12)
     {
-        lix.brightness(64);
+        uint8_t br = br_day;
+        uint8_t factor = (br_day-br_night)/steps;
+        for (int i=0; i<steps; i++)
+        {
+            br -= factor;
+            lix.brightness(br);
+            lix.show();
+            delay(50);
+        }
+        lix.brightness(br_night);
         nightMode = true;
         Serial.println("Night mode.");
     }
     else if (nightMode && (hour(local) >= DAY_HOUR && minute(local) >= DAY_MIN)
              && hour(local) < 12)
     {
-        lix.brightness(255);
+        uint8_t br = br_night;
+        uint8_t factor = (br_day-br_night)/steps;
+        for (int i=0; i<steps; i++)
+        {
+            br += factor;
+            lix.brightness(br);
+            lix.show();
+            delay(50);
+        }
+        lix.brightness(br_day);
         nightMode = false;
         Serial.println("Day mode.");
     }
@@ -360,9 +383,9 @@ bool setNtpTime(void)
         unsigned long epoch = secsSince1900 - seventyYears;
         // add any procssing delays (rounded up)
         epoch += (millis() - t + 500)/1000;
+        setTime(epoch);
         // print Unix time:
         Serial.println(epoch);
-        setTime(epoch);
         // Record last sync time.
         lastSync = epoch;
         return true;
